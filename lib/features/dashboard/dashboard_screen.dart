@@ -27,7 +27,9 @@ class DashboardScreen extends ConsumerWidget {
     final categoryTotals = ref.watch(categoryExpenseProvider);
     final recentTransactions = ref.watch(recentTransactionsProvider);
     final currency = ref.watch(currencyProvider);
-    final bottomFloatingSpace = 160 + MediaQuery.viewPaddingOf(context).bottom;
+    final double topInset = MediaQuery.of(context).viewPadding.top;
+    final double bottomPadding =
+      MediaQuery.of(context).viewPadding.bottom > 0 ? 160 : 130;
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -37,11 +39,9 @@ class DashboardScreen extends ConsumerWidget {
           colors: [Color(0xFF12131A), AppColors.background],
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(20, 14, 20, bottomFloatingSpace),
-          children: [
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, topInset + 14, 20, bottomPadding),
+        children: [
             Row(
               children: [
                 Expanded(
@@ -192,7 +192,6 @@ class DashboardScreen extends ConsumerWidget {
                 );
               }),
           ],
-        ),
       ),
     );
   }
@@ -435,8 +434,6 @@ void _showCurrencyPicker(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) {
-      final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
-
       return DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.62,
@@ -450,7 +447,7 @@ void _showCurrencyPicker(
             ),
             child: ListView.builder(
               controller: controller,
-              padding: EdgeInsets.fromLTRB(20, 14, 20, 10 + bottomPadding),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
               itemCount: kCurrencyOptions.length + 1,
               itemBuilder: (context, index) {
                 if (index == 0) {

@@ -16,6 +16,7 @@ class SubscriptionService {
   static const String deepLinkHost = 'success';
   static const String isProActiveKey = 'is_pro_active';
   static const String purchaseDateKey = 'pro_purchase_date_ms';
+  static const String premiumExpiryDateKey = 'pro_premium_expiry_date_ms';
   static const String pendingCheckoutNonceKey = 'pro_pending_checkout_nonce';
   static const String pendingCheckoutStartedAtKey =
       'pro_pending_checkout_started_at_ms';
@@ -104,7 +105,15 @@ class SubscriptionService {
   }
 
   bool get isProActive {
-    return _box.get(isProActiveKey, defaultValue: false) == true;
+    final rawActive = _box.get(isProActiveKey, defaultValue: false) == true;
+    final expiry = premiumExpiryDate ?? expiresOn;
+    if (expiry == null) {
+      return false;
+    }
+    if (DateTime.now().isBefore(expiry)) {
+      return true;
+    }
+    return rawActive && DateTime.now().isBefore(expiry);
   }
 
   DateTime? get purchaseDate {
@@ -117,6 +126,14 @@ class SubscriptionService {
 
   DateTime? get pendingCheckoutStartedAt {
     final raw = _box.get(pendingCheckoutStartedAtKey);
+    if (raw is int) {
+      return DateTime.fromMillisecondsSinceEpoch(raw);
+    }
+    return null;
+  }
+
+  DateTime? get premiumExpiryDate {
+    final raw = _box.get(premiumExpiryDateKey);
     if (raw is int) {
       return DateTime.fromMillisecondsSinceEpoch(raw);
     }
@@ -141,6 +158,11 @@ class SubscriptionService {
   }
 
   DateTime? get expiresOn {
+    final explicitExpiry = premiumExpiryDate;
+    if (explicitExpiry != null) {
+      return explicitExpiry;
+    }
+
     final date = purchaseDate;
     if (date == null) {
       return null;
@@ -150,10 +172,17 @@ class SubscriptionService {
 
   Future<void> activatePro({DateTime? purchasedAt}) async {
     final now = purchasedAt ?? DateTime.now();
-    await _box.put(isProActiveKey, true);
+    final expiry = now.add(const Duration(days: 30));
     await _box.put(purchaseDateKey, now.millisecondsSinceEpoch);
+    await _box.put(premiumExpiryDateKey, expiry.millisecondsSinceEpoch);
+    await _box.put(isProActiveKey, true);
     await _box.delete(pendingCheckoutNonceKey);
     await _box.delete(pendingCheckoutStartedAtKey);
+  }
+
+  Future<bool> restorePremiumPurchase() async {
+    await maybeExpirePro();
+    return isProActive;
   }
 
   Future<void> clearPendingCheckout() async {
@@ -162,13 +191,26 @@ class SubscriptionService {
   }
 
   Future<void> maybeExpirePro() async {
-    final expiry = expiresOn;
+    final rawActive = _box.get(isProActiveKey, defaultValue: false) == true;
+    final expiry = premiumExpiryDate ?? expiresOn;
     if (expiry == null) {
+      if (rawActive) {
+        await _box.put(isProActiveKey, false);
+      }
       return;
     }
-    if (DateTime.now().isAfter(expiry)) {
+
+    if (DateTime.now().isBefore(expiry)) {
+      if (!rawActive) {
+        await _box.put(isProActiveKey, true);
+      }
+      return;
+    }
+
+    if (rawActive) {
       await _box.put(isProActiveKey, false);
       await _box.delete(purchaseDateKey);
+      await _box.delete(premiumExpiryDateKey);
     }
   }
 
@@ -180,39 +222,9 @@ class SubscriptionService {
       DateTime.now().millisecondsSinceEpoch,
     );
 
-    final successDeepLink = Uri(
-      scheme: deepLinkScheme,
-      host: deepLinkHost,
-      queryParameters: {
-        'status': 'paid',
-        'variant_id': variantId.toString(),
-        'nonce': nonce,
-      },
-    );
-
-    final cancelDeepLink = Uri(
-      scheme: deepLinkScheme,
-      host: deepLinkHost,
-      queryParameters: {
-        'status': 'cancelled',
-        'variant_id': variantId.toString(),
-        'nonce': nonce,
-      },
-    );
-
-    final successUrl = successDeepLink.toString();
-    final cancelUrl = cancelDeepLink.toString();
-
     return Uri.parse(checkoutUrl).replace(
       queryParameters: {
         'media': '0',
-        'redirect_url': successUrl,
-        'success_url': successUrl,
-        'cancel_url': cancelUrl,
-        'checkout[redirect_url]': successUrl,
-        'checkout[success_url]': successUrl,
-        'checkout[cancel_url]': cancelUrl,
-        'product_options[redirect_url]': successUrl,
       },
     );
   }

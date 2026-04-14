@@ -13,23 +13,38 @@ import '../../shared/widgets/transaction_tile.dart';
 import '../transactions/models/expense_transaction.dart';
 import '../transactions/providers/transaction_notifier.dart';
 
-class HistoryScreen extends ConsumerWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
     final allTransactions = ref.watch(transactionsProvider);
     final currency = ref.watch(currencyProvider);
     final isProAsync = ref.watch(subscriptionProvider);
-    final bottomFloatingSpace = 160 + MediaQuery.viewPaddingOf(context).bottom;
+    final double topInset = MediaQuery.of(context).viewPadding.top;
+    final double bottomPadding =
+        MediaQuery.of(context).viewPadding.bottom > 0 ? 160 : 130;
     final isPro =
         isProAsync.valueOrNull ??
         ref.read(subscriptionServiceProvider).isProActive;
+    final normalizedQuery = _searchQuery.trim().toLowerCase();
+    final filteredTransactions = allTransactions
+      .where(
+        (t) => t.title.toLowerCase().contains(normalizedQuery),
+      )
+        .toList(growable: false);
 
     final visibleTransactions = isPro
-        ? allTransactions
-        : allTransactions.take(5).toList(growable: false);
-    final showPremiumLock = !isPro && allTransactions.length > 5;
+        ? filteredTransactions
+        : filteredTransactions.take(5).toList(growable: false);
+    final showPremiumLock = !isPro && filteredTransactions.length > 5;
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -39,71 +54,62 @@ class HistoryScreen extends ConsumerWidget {
           colors: [Color(0xFF12131A), AppColors.background],
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-          child: visibleTransactions.isEmpty
-              ? Center(
-                  child: Text(
-                    'No transactions found',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.68),
-                      fontSize: 15,
-                    ),
-                  ),
-                )
-              : _HistoryList(
-                  transactions: visibleTransactions,
-                  currencyCode: currency.code,
-                  currencySymbol: currency.symbol,
-                  showPremiumLock: showPremiumLock,
-                  bottomPadding: bottomFloatingSpace,
-                  onGoPro: () async {
-                    final service = ref.read(subscriptionServiceProvider);
-                    Uri checkoutUri;
-                    try {
-                      checkoutUri = await service.createCheckoutUri();
-                    } catch (_) {
-                      if (!context.mounted) {
-                        return;
-                      }
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 0),
+        child: _HistoryList(
+          transactions: visibleTransactions,
+          currencyCode: currency.code,
+          currencySymbol: currency.symbol,
+          showPremiumLock: showPremiumLock,
+          bottomPadding: bottomPadding,
+          searchQuery: _searchQuery,
+          onSearchChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+          onGoPro: () async {
+            final service = ref.read(subscriptionServiceProvider);
+            Uri checkoutUri;
+            try {
+              checkoutUri = await service.createCheckoutUri();
+            } catch (_) {
+              if (!context.mounted) {
+                return;
+              }
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Could not start checkout right now.'),
-                        ),
-                      );
-                      return;
-                    }
-
-                    if (!context.mounted) {
-                      return;
-                    }
-
-                    final paid = await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => CheckoutWebViewScreen(
-                          checkoutUri: checkoutUri,
-                        ),
-                      ),
-                    );
-
-                    if (!context.mounted || paid == null) {
-                      return;
-                    }
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          paid
-                              ? 'Premium activated. Full history unlocked.'
-                              : 'Payment was cancelled or not completed.',
-                        ),
-                      ),
-                    );
-                  },
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Could not start checkout right now.'),
                 ),
+              );
+              return;
+            }
+
+            if (!context.mounted) {
+              return;
+            }
+
+            final paid = await Navigator.of(context).push<bool>(
+              MaterialPageRoute(
+                builder: (_) => CheckoutWebViewScreen(checkoutUri: checkoutUri),
+              ),
+            );
+
+            if (!context.mounted || paid == null) {
+              return;
+            }
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  paid
+                      ? 'Premium activated for 30 days. Full history unlocked.'
+                      : 'Payment was cancelled or not completed.',
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -117,6 +123,8 @@ class _HistoryList extends ConsumerWidget {
     required this.currencySymbol,
     required this.showPremiumLock,
     required this.bottomPadding,
+    required this.searchQuery,
+    required this.onSearchChanged,
     required this.onGoPro,
   });
 
@@ -125,6 +133,8 @@ class _HistoryList extends ConsumerWidget {
   final String currencySymbol;
   final bool showPremiumLock;
   final double bottomPadding;
+  final String searchQuery;
+  final ValueChanged<String> onSearchChanged;
   final Future<void> Function() onGoPro;
 
   @override
@@ -140,6 +150,45 @@ class _HistoryList extends ConsumerWidget {
           style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
         ).animate().fadeIn(duration: 400.ms),
         const SizedBox(height: 12),
+        TextField(
+          onChanged: onSearchChanged,
+          decoration: InputDecoration(
+            hintText: 'Search by title',
+            prefixIcon: const Icon(Icons.search_rounded),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.06),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (transactions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              searchQuery.isEmpty
+                  ? 'No transactions found'
+                  : 'No matching transactions found',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.68),
+                fontSize: 15,
+              ),
+            ),
+          ),
         ...grouped.entries.map((monthEntry) {
           final monthTitle = monthEntry.key;
           final days = monthEntry.value;
@@ -268,7 +317,7 @@ class _PremiumLockedCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'You are viewing the first 5 transactions. Unlock Pro to see your full history forever.',
+            'You are viewing the first 5 transactions. Start your 1-month free trial to unlock full history. Access returns to 5 transactions when the period ends unless you upgrade again.',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.72),
               height: 1.35,
