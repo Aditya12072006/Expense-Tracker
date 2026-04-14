@@ -43,47 +43,59 @@ class _RootShellState extends State<RootShell> {
           child: const Icon(Icons.add_rounded, size: 32),
         ),
       ),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(18, 0, 18, 8 + bottomInset),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              height: 74,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.12),
-                    Colors.white.withValues(alpha: 0.05),
-                  ],
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  height: 74,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.12),
+                        Colors.white.withValues(alpha: 0.05),
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _NavItem(
+                        icon: Icons.home_filled,
+                        label: 'Dashboard',
+                        selected: _index == 0,
+                        onTap: () => setState(() => _index = 0),
+                      ),
+                      const SizedBox(width: 50),
+                      _NavItem(
+                        icon: Icons.stacked_line_chart_rounded,
+                        label: 'History',
+                        selected: _index == 1,
+                        onTap: () => setState(() => _index = 1),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _NavItem(
-                    icon: Icons.home_filled,
-                    label: 'Dashboard',
-                    selected: _index == 0,
-                    onTap: () => setState(() => _index = 0),
-                  ),
-                  const SizedBox(width: 50),
-                  _NavItem(
-                    icon: Icons.stacked_line_chart_rounded,
-                    label: 'History',
-                    selected: _index == 1,
-                    onTap: () => setState(() => _index = 1),
-                  ),
-                ],
               ),
             ),
           ),
-        ),
+          if (bottomInset > 0)
+            Container(
+              height: bottomInset,
+              color: Colors.black,
+            ),
+        ],
       ),
     );
   }

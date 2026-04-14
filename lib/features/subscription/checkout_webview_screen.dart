@@ -42,23 +42,33 @@ class _CheckoutWebViewScreenState extends ConsumerState<CheckoutWebViewScreen> {
                 }
                 setState(() => _isLoading = false);
               },
-              onNavigationRequest: (request) {
-                _handleNavigation(request.url);
-                return NavigationDecision.navigate;
+              onNavigationRequest: (request) async {
+                return _handleNavigationRequest(request.url);
+              },
+              onWebResourceError: (error) {
+                if (!mounted || error.isForMainFrame != true) {
+                  return;
+                }
+                setState(() => _isLoading = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to load checkout. Please try again.'),
+                  ),
+                );
               },
             ),
           )
           ..loadRequest(widget.checkoutUri);
   }
 
-  Future<void> _handleNavigation(String rawUrl) async {
+  Future<NavigationDecision> _handleNavigationRequest(String rawUrl) async {
     if (_didComplete) {
-      return;
+      return NavigationDecision.prevent;
     }
 
     final uri = Uri.tryParse(rawUrl);
     if (uri == null) {
-      return;
+      return NavigationDecision.navigate;
     }
 
     final service = ref.read(subscriptionServiceProvider);
@@ -67,20 +77,27 @@ class _CheckoutWebViewScreenState extends ConsumerState<CheckoutWebViewScreen> {
       _didComplete = true;
       await service.clearPendingCheckout();
       if (!mounted) {
-        return;
+        return NavigationDecision.prevent;
       }
       Navigator.of(context).pop(false);
-      return;
+      return NavigationDecision.prevent;
     }
 
     if (service.isPaidSuccessLink(uri) || service.isHostedCheckoutSuccessLink(uri)) {
       _didComplete = true;
       await service.activatePro();
       if (!mounted) {
-        return;
+        return NavigationDecision.prevent;
       }
       Navigator.of(context).pop(true);
+      return NavigationDecision.prevent;
     }
+
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      return NavigationDecision.prevent;
+    }
+
+    return NavigationDecision.navigate;
   }
 
   Future<bool> _resolveFromCurrentUrlBeforeExit() async {

@@ -126,7 +126,7 @@ class _PremiumActivatedSnack extends StatelessWidget {
         const SizedBox(width: 10),
         const Expanded(
           child: Text(
-            'Premium Activated. Unlimited history is now unlocked.',
+            'Premium activated for 30 days. Full history is now unlocked.',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),

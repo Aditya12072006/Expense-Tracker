@@ -74,6 +74,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
 
+    // Build and reveal the premium lock card on smaller viewports.
+    await tester.drag(find.byType(ListView).first, const Offset(0, -800));
+    await tester.pump();
+
     expect(find.byType(TransactionTile), findsNWidgets(5));
     expect(find.text('Premium Locked'), findsOneWidget);
     expect(find.text('Tx5'), findsNothing);
@@ -81,6 +85,10 @@ void main() {
   });
 
   testWidgets('History is fully visible for Pro users', (tester) async {
+    await Hive.box<dynamic>(HiveBoxes.settings).put(
+      SubscriptionService.purchaseDateKey,
+      DateTime.now().millisecondsSinceEpoch,
+    );
     await Hive.box<dynamic>(HiveBoxes.settings).put(
       SubscriptionService.isProActiveKey,
       true,

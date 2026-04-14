@@ -18,4 +18,5 @@ const List<TransactionCategory> kTransactionCategories = [
   TransactionCategory('Salary', Icons.payments_rounded),
   TransactionCategory('Freelance', Icons.laptop_mac_rounded),
   TransactionCategory('Savings', Icons.savings_rounded),
+  TransactionCategory('Others', Icons.category_rounded),
 ];
