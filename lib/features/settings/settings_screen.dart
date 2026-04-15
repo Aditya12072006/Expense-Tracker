@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/storage/hive_boxes.dart';
@@ -67,9 +68,18 @@ class SettingsScreen extends ConsumerWidget {
       }
     }
 
-    // saveFile with MimeType.csv and file extension .csv often defaults to Downloads on Android/iOS.
-    // However, saveAs prompts the user to pick a location, ensuring they find it.
-    // For production readiness, saveAs is safer as it involves the user in the folder selection.
+    // Android 11+ (SDK 30+) often restricts direct folder access.
+    // To ensure the user finds the file, we use Share.shareXFiles.
+    // This allows the user to select 'Save to Drive', 'Send to WhatsApp', 
+    // or 'Save to device/Downloads' explicitly.
+    final xFile = XFile.fromData(
+      bytes,
+      name: '$fileBaseName.csv',
+      mimeType: 'text/csv',
+    );
+    await Share.shareXFiles([xFile], text: 'Exported Transactions');
+
+    // Also attempt saving for backup
     final savedPath = await FileSaver.instance.saveFile(
       name: fileBaseName,
       bytes: bytes,
