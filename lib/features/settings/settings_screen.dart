@@ -1,12 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/storage/hive_boxes.dart';
@@ -50,6 +53,23 @@ class SettingsScreen extends ConsumerWidget {
     }
 
     final bytes = Uint8List.fromList(utf8.encode(buffer.toString()));
+
+    if (Platform.isAndroid) {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      // Android 10 (SDK 29) and above use scoped storage, no permission needed for Downloads.
+      // Below 10, we need WRITE_EXTERNAL_STORAGE.
+      if (androidInfo.version.sdkInt < 29) {
+        final status = await Permission.storage.request();
+        if (!status.isGranted) {
+          throw Exception('Storage permission required');
+        }
+      }
+    }
+
+    // saveFile with MimeType.csv and file extension .csv often defaults to Downloads on Android/iOS.
+    // However, saveAs prompts the user to pick a location, ensuring they find it.
+    // For production readiness, saveAs is safer as it involves the user in the folder selection.
     final savedPath = await FileSaver.instance.saveFile(
       name: fileBaseName,
       bytes: bytes,
@@ -94,13 +114,17 @@ class SettingsScreen extends ConsumerWidget {
               String path;
               try {
                 path = await _exportTransactionsToCsv(transactions);
-              } catch (_) {
+              } catch (e) {
                 if (!context.mounted) {
                   return;
                 }
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('CSV export failed. Please try again.'),
+                  SnackBar(
+                    content: Text(
+                      e.toString().contains('permission')
+                          ? 'Permission denied. Could not save file.'
+                          : 'CSV export failed. Please try again.',
+                    ),
                   ),
                 );
                 return;
