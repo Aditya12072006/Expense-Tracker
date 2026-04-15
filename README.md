@@ -2,6 +2,73 @@
 
 A new Flutter project.
 
+## Third-Party APK Store Readiness (Uptodown, APKPure, etc.)
+
+This app is now configured for direct APK distribution outside Google Play/App Store.
+
+### Implemented in this project
+
+- In-app Privacy Policy page in Settings
+- In-app App Info page (version name, build number, package name)
+- In-app Open Source Licenses page
+- In-app clear local data action (for user data deletion)
+- Android manifest network permissions for payment/web connectivity
+- Release signing configuration using android/key.properties
+- Android application ID preserved: com.example.expensetracker
+
+### Required before uploading APK
+
+1. Set a stable app version in pubspec.yaml (example: 1.2.0+12).
+2. Generate a release keystore if you do not have one.
+3. Copy android/key.properties.example to android/key.properties and fill real values.
+4. Place your .jks keystore in android/ and ensure it is not committed.
+5. Build a signed release APK.
+6. Verify install on at least one real Android device.
+
+### Build signed APK (Windows PowerShell)
+
+1. Generate keystore (first time only):
+
+	keytool -genkey -v -keystore android/upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+
+2. Update signing config:
+
+	Copy android/key.properties.example to android/key.properties and set:
+
+	- storePassword
+	- keyPassword
+	- keyAlias
+	- storeFile
+
+3. Build APK:
+
+	flutter clean
+	flutter pub get
+	flutter build apk --release
+
+4. Output file:
+
+	build/app/outputs/flutter-apk/app-release.apk
+
+### Store listing items you still need to prepare manually
+
+- App title and short description
+- Full description and changelog
+- Screenshots and app icon (store assets)
+- Category and tags
+- Support email: aditya12072006@gmail.com
+- Public privacy policy URL (recommended for store submission forms)
+
+If your store asks for architecture-specific APKs, use split build:
+
+flutter build apk --release --split-per-abi
+
+Outputs:
+
+- app-armeabi-v7a-release.apk
+- app-arm64-v8a-release.apk
+- app-x86_64-release.apk
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

@@ -69,30 +69,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             });
           },
           onGoPro: () async {
-            final service = ref.read(subscriptionServiceProvider);
-            Uri checkoutUri;
-            try {
-              checkoutUri = await service.createCheckoutUri();
-            } catch (_) {
-              if (!context.mounted) {
-                return;
-              }
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Could not start checkout right now.'),
-                ),
-              );
-              return;
-            }
-
-            if (!context.mounted) {
-              return;
-            }
-
             final paid = await Navigator.of(context).push<bool>(
               MaterialPageRoute(
-                builder: (_) => CheckoutWebViewScreen(checkoutUri: checkoutUri),
+                builder: (_) => const CheckoutWebViewScreen(),
               ),
             );
 

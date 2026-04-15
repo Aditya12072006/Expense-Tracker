@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'providers/subscription_provider.dart';
 
 class CheckoutWebViewScreen extends ConsumerStatefulWidget {
-  const CheckoutWebViewScreen({
-    super.key,
-    required this.checkoutUri,
-  });
-
-  final Uri checkoutUri;
+  const CheckoutWebViewScreen({super.key});
 
   @override
   ConsumerState<CheckoutWebViewScreen> createState() =>
@@ -18,159 +13,118 @@ class CheckoutWebViewScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckoutWebViewScreenState extends ConsumerState<CheckoutWebViewScreen> {
-  late final WebViewController _controller;
-  bool _isLoading = true;
+  late final Razorpay _razorpay;
   bool _didComplete = false;
 
   @override
   void initState() {
     super.initState();
-    _controller =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageStarted: (_) {
-                if (!mounted) {
-                  return;
-                }
-                setState(() => _isLoading = true);
-              },
-              onPageFinished: (_) {
-                if (!mounted) {
-                  return;
-                }
-                setState(() => _isLoading = false);
-              },
-              onNavigationRequest: (request) async {
-                return _handleNavigationRequest(request.url);
-              },
-              onWebResourceError: (error) {
-                if (!mounted || error.isForMainFrame != true) {
-                  return;
-                }
-                setState(() => _isLoading = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Unable to load checkout. Please try again.'),
-                  ),
-                );
-              },
-            ),
-          )
-          ..loadRequest(widget.checkoutUri);
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openCheckout();
+    });
   }
 
-  Future<NavigationDecision> _handleNavigationRequest(String rawUrl) async {
+  void _openCheckout() {
     if (_didComplete) {
-      return NavigationDecision.prevent;
+      return;
     }
 
-    final uri = Uri.tryParse(rawUrl);
-    if (uri == null) {
-      return NavigationDecision.navigate;
-    }
+    final options = {
+      'key': razorpayKeyId,
+      'amount': premiumAmountPaise,
+      'name': 'Expense Tracker Premium',
+      'description': 'Unlock full history for 30 days',
+      'timeout': 300,
+      'theme': {'color': '#3B82F6'},
+      'prefill': {
+        'contact': '',
+        'email': '',
+      },
+    };
 
-    final service = ref.read(subscriptionServiceProvider);
-
-    if (service.isCancelledLink(uri) || service.isHostedCheckoutCancelledLink(uri)) {
-      _didComplete = true;
-      await service.clearPendingCheckout();
+    try {
+      _razorpay.open(options);
+    } catch (_) {
       if (!mounted) {
-        return NavigationDecision.prevent;
+        return;
       }
       Navigator.of(context).pop(false);
-      return NavigationDecision.prevent;
     }
-
-    if (service.isPaidSuccessLink(uri) || service.isHostedCheckoutSuccessLink(uri)) {
-      _didComplete = true;
-      await service.activatePro();
-      if (!mounted) {
-        return NavigationDecision.prevent;
-      }
-      Navigator.of(context).pop(true);
-      return NavigationDecision.prevent;
-    }
-
-    if (uri.scheme != 'http' && uri.scheme != 'https') {
-      return NavigationDecision.prevent;
-    }
-
-    return NavigationDecision.navigate;
   }
 
-  Future<bool> _resolveFromCurrentUrlBeforeExit() async {
+  Future<void> _onPaymentSuccess(PaymentSuccessResponse response) async {
     if (_didComplete) {
-      return true;
+      return;
     }
+    _didComplete = true;
 
-    final currentRawUrl = await _controller.currentUrl();
-    final currentUri = currentRawUrl == null ? null : Uri.tryParse(currentRawUrl);
-    if (currentUri != null) {
-      final service = ref.read(subscriptionServiceProvider);
-      if (service.isPaidSuccessLink(currentUri) ||
-          service.isHostedCheckoutSuccessLink(currentUri)) {
-        _didComplete = true;
-        await service.activatePro();
-        if (!mounted) {
-          return true;
-        }
-        Navigator.of(context).pop(true);
-        return true;
-      }
-
-      if (service.isCancelledLink(currentUri) ||
-          service.isHostedCheckoutCancelledLink(currentUri)) {
-        _didComplete = true;
-        await service.clearPendingCheckout();
-        if (!mounted) {
-          return true;
-        }
-        Navigator.of(context).pop(false);
-        return true;
-      }
+    await ref.read(subscriptionServiceProvider).activatePro();
+    if (!mounted) {
+      return;
     }
+    Navigator.of(context).pop(true);
+  }
 
-    await ref.read(subscriptionServiceProvider).clearPendingCheckout();
-    return false;
+  void _onPaymentError(PaymentFailureResponse response) {
+    if (_didComplete) {
+      return;
+    }
+    _didComplete = true;
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop(false);
+  }
+
+  void _onExternalWallet(ExternalWalletResponse response) {
+    if (_didComplete) {
+      return;
+    }
+    _didComplete = true;
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop(false);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope<bool>(
       canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) {
           return;
         }
 
-        final navigator = Navigator.of(context);
-        final wasHandled = await _resolveFromCurrentUrlBeforeExit();
-        if (!wasHandled && navigator.mounted) {
-          navigator.pop(false);
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(false);
         }
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Secure Checkout'),
+          title: const Text('Razorpay Checkout'),
           leading: IconButton(
             icon: const Icon(Icons.close),
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              final wasHandled = await _resolveFromCurrentUrlBeforeExit();
-              if (!wasHandled && navigator.mounted) {
-                navigator.pop(false);
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop(false);
               }
             },
           ),
         ),
-        body: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_isLoading)
-              const LinearProgressIndicator(minHeight: 2),
-          ],
+        body: const Center(
+          child: CircularProgressIndicator(),
         ),
       ),
     );

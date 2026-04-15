@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -57,6 +58,12 @@ class DashboardScreen extends ConsumerWidget {
                 _CurrencyButton(
                   selected: currency,
                   onTap: () => _showCurrencyPicker(context, ref, currency),
+                ),
+                const SizedBox(width: 10),
+                IconButton.filledTonal(
+                  tooltip: 'Settings',
+                  onPressed: () => context.push('/settings'),
+                  icon: const Icon(Icons.settings_rounded),
                 ),
               ],
             ).animate().fadeIn(duration: 450.ms),

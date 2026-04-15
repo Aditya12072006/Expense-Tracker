@@ -1,6 +1,3 @@
-import 'dart:async';
-
-import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,96 +13,43 @@ class ExpenseTrackerApp extends ConsumerStatefulWidget {
   ConsumerState<ExpenseTrackerApp> createState() => _ExpenseTrackerAppState();
 }
 
-class _ExpenseTrackerAppState extends ConsumerState<ExpenseTrackerApp>
-    with WidgetsBindingObserver {
-  final AppLinks _appLinks = AppLinks();
-  StreamSubscription<Uri>? _deepLinkSubscription;
-  String? _lastHandledLink;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _listenForDeepLinks();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _deepLinkSubscription?.cancel();
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _checkLatestDeepLink();
-    }
-  }
-
-  Future<void> _listenForDeepLinks() async {
-    final initial = await _appLinks.getInitialLink();
-    if (!mounted) {
-      return;
-    }
-    await _handleDeepLink(initial);
-
-    _deepLinkSubscription = _appLinks.uriLinkStream.listen((uri) async {
-      await _handleDeepLink(uri);
-    });
-  }
-
-  Future<void> _checkLatestDeepLink() async {
-    final latest = await _appLinks.getInitialLink();
-    if (!mounted) {
-      return;
-    }
-    await _handleDeepLink(latest);
-  }
-
-  Future<void> _handleDeepLink(Uri? uri) async {
-    if (uri == null) {
-      return;
-    }
-
-    final service = ref.read(subscriptionServiceProvider);
-    if (service.isCancelledLink(uri)) {
-      await service.clearPendingCheckout();
-      return;
-    }
-
-    if (!service.isPaidSuccessLink(uri)) {
-      return;
-    }
-
-    if (_lastHandledLink == uri.toString()) {
-      return;
-    }
-    _lastHandledLink = uri.toString();
-
-    await service.activatePro();
-    if (!mounted) {
-      return;
-    }
-
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 4),
-        content: const _PremiumActivatedSnack(),
-      ),
-    );
-  }
+class _ExpenseTrackerAppState extends ConsumerState<ExpenseTrackerApp> {
+  bool _wasProActive = false;
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(subscriptionProvider);
+    final proState = ref.watch(subscriptionProvider);
+
+    proState.whenData((isProActive) {
+      if (!_wasProActive && isProActive) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+
+          final messenger = _messengerKey.currentState;
+          if (messenger == null) {
+            return;
+          }
+          messenger.hideCurrentSnackBar();
+          messenger.showSnackBar(
+            const SnackBar(
+              duration: Duration(seconds: 4),
+              content: _PremiumActivatedSnack(),
+            ),
+          );
+        });
+      }
+      _wasProActive = isProActive;
+    });
 
     return MaterialApp.router(
       title: 'Expense Tracker',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
+      scaffoldMessengerKey: _messengerKey,
       routerConfig: appRouter,
     );
   }

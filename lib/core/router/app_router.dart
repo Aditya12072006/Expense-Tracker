@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/add_transaction/add_transaction_screen.dart';
+import '../../features/settings/app_info_screen.dart';
+import '../../features/settings/privacy_policy_screen.dart';
 import '../../features/root/root_shell.dart';
 import '../../features/settings/settings_screen.dart';
 
@@ -35,6 +37,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/settings',
       builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/privacy-policy',
+      builder: (context, state) => const PrivacyPolicyScreen(),
+    ),
+    GoRoute(
+      path: '/app-info',
+      builder: (context, state) => const AppInfoScreen(),
     ),
   ],
 );

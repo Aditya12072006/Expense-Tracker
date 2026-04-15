@@ -68,6 +68,14 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       return;
     }
 
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title is required')),
+      );
+      return;
+    }
+
     final selectedDay = DateUtils.dateOnly(_selectedDate);
     final today = DateUtils.dateOnly(DateTime.now());
     if (selectedDay.isAfter(today)) {
@@ -92,7 +100,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         .addTransaction(
           ExpenseTransaction(
             id: const Uuid().v4(),
-            title: _titleController.text.trim(),
+            title: title,
             amount: amount,
             date: _selectedDate,
             category: _selectedCategory,

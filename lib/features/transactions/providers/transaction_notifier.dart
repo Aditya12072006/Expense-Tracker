@@ -21,6 +21,11 @@ class TransactionNotifier extends Notifier<List<ExpenseTransaction>> {
   }
 
   void addTransaction(ExpenseTransaction transaction) {
+    final normalizedTitle = transaction.title.trim();
+    if (normalizedTitle.isEmpty) {
+      return;
+    }
+
     _box.put(transaction.id, transaction);
     state = _sorted(_box.values.toList(growable: false));
   }
@@ -28,6 +33,11 @@ class TransactionNotifier extends Notifier<List<ExpenseTransaction>> {
   void deleteTransaction(String id) {
     _box.delete(id);
     state = _sorted(_box.values.toList(growable: false));
+  }
+
+  Future<void> clearAllTransactions() async {
+    await _box.clear();
+    state = const <ExpenseTransaction>[];
   }
 
   List<ExpenseTransaction> _sorted(List<ExpenseTransaction> transactions) {
